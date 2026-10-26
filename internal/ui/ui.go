@@ -82,7 +82,7 @@ func RenderTable(rows []Row, linksSupported, colorEnabled bool) string {
 		// includes invisible escape bytes when hyperlinked) doesn't
 		// affect alignment of the columns before it.
 		for j := 0; j < len(headers)-1; j++ {
-			if l := len(cells[i][j]); l > widths[j] {
+			if l := uniseg.StringWidth(cells[i][j]); l > widths[j] {
 				widths[j] = l
 			}
 		}
@@ -94,7 +94,7 @@ func RenderTable(rows []Row, linksSupported, colorEnabled bool) string {
 		for i, h := range headers {
 			cell := h
 			if i != len(headers)-1 {
-				cell = fmt.Sprintf("%-*s", widths[i], h)
+				cell = pad(h, widths[i])
 			}
 			b.WriteString(Style(cell, Bold, colorEnabled))
 			if i != len(headers)-1 {
@@ -110,7 +110,7 @@ func RenderTable(rows []Row, linksSupported, colorEnabled bool) string {
 				b.WriteString(styleCell(i, c, r, colorEnabled))
 				continue
 			}
-			padded := fmt.Sprintf("%-*s", widths[i], c)
+			padded := pad(c, widths[i])
 			b.WriteString(styleCell(i, padded, r, colorEnabled))
 			b.WriteString("  ")
 		}
@@ -155,15 +155,35 @@ func styleCell(col int, s string, r Row, colorEnabled bool) string {
 	}
 }
 
+// truncate shortens s to at most max terminal cells, ending in "…" when
+// anything was cut.
 func truncate(s string, max int) string {
-	r := []rune(s)
-	if len(r) <= max {
+	if uniseg.StringWidth(s) <= max {
 		return s
 	}
-	if max <= 1 {
-		return string(r[:max])
+	if max <= 0 {
+		return ""
 	}
-	return string(r[:max-1]) + "…"
+	var b strings.Builder
+	w := 0
+	gr := uniseg.NewGraphemes(s)
+	for gr.Next() {
+		gw := gr.Width()
+		if w+gw > max-1 {
+			break
+		}
+		b.WriteString(gr.Str())
+		w += gw
+	}
+	return b.String() + "…"
+}
+
+// pad right-pads s with spaces to w terminal cells.
+func pad(s string, w int) string {
+	if n := w - uniseg.StringWidth(s); n > 0 {
+		return s + strings.Repeat(" ", n)
+	}
+	return s
 }
 
 // FormatAge renders a duration as a short, human-scaled age like "3m",

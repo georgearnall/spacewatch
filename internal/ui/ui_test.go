@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/rivo/uniseg"
 )
 
 func TestFormatAge(t *testing.T) {
@@ -96,6 +98,22 @@ func TestRenderTable_ColumnsAlign_WithColorEnabled(t *testing.T) {
 	}
 }
 
+func TestRenderTable_ColumnsAlign_ByDisplayWidth(t *testing.T) {
+	// A truncated title ends in a 3-byte, 1-cell "…", and the stack name
+	// contains wide characters, so byte-length padding would misalign.
+	rows := []Row{
+		{Team: "e", Stack: "日本", Title: strings.Repeat("x", 80), Age: "1m", URL: "u"},
+		{Team: "e", Stack: "s", Title: "t", Age: "1m", URL: "u"},
+	}
+	lines := strings.Split(strings.TrimRight(RenderTable(rows, false, false), "\n"), "\n")
+	want := uniseg.StringWidth(lines[0][:strings.Index(lines[0], "LINK")])
+	for i, l := range lines[1:] {
+		if got := uniseg.StringWidth(l[:strings.LastIndex(l, "u")]); got != want {
+			t.Errorf("row %d: LINK column at cell %d, want %d\n%q", i, got, want, l)
+		}
+	}
+}
+
 func TestRenderTable_ColorEnabled(t *testing.T) {
 	rows := []Row{{Team: "ecommerce", Stack: "orders-api", Title: "apply", Age: "5m", URL: "u", Selected: true}}
 	got := RenderTable(rows, false, true)
@@ -157,11 +175,15 @@ func TestTruncate(t *testing.T) {
 		t.Errorf("truncate(short) = %q, want unchanged", got)
 	}
 	got := truncate("this is a long title that exceeds the limit", 10)
-	if len([]rune(got)) > 10 {
-		t.Errorf("truncate() = %q, exceeds max length 10 runes", got)
+	if uniseg.StringWidth(got) != 10 {
+		t.Errorf("truncate() = %q, want exactly 10 cells", got)
 	}
 	if !strings.HasSuffix(got, "…") {
 		t.Errorf("truncate() = %q, want ellipsis suffix", got)
+	}
+	// A wide character that would straddle the limit is dropped whole.
+	if got := truncate("ab日本語", 5); got != "ab日…" {
+		t.Errorf("truncate(wide) = %q, want %q", got, "ab日…")
 	}
 }
 
