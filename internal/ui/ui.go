@@ -66,7 +66,8 @@ const (
 // selected row's marker is highlighted.
 //
 // cols is the terminal width (0 if unknown). When the table is wider,
-// titles are truncated further to fit.
+// titles are truncated further to fit, and if that isn't enough each row
+// is stacked over several lines instead.
 func RenderTable(rows []Row, linksSupported, colorEnabled bool, cols int) string {
 	if len(rows) == 0 {
 		return "no pending confirmations for your team\n"
@@ -76,7 +77,10 @@ func RenderTable(rows []Row, linksSupported, colorEnabled bool, cols int) string
 	if cols > 0 {
 		_, widths := tableCells(rows, linksSupported, maxTitle)
 		if over := tableWidth(widths) - cols; over > 0 {
-			titleMax = max(widths[3]-over, minTitle)
+			titleMax = widths[3] - over
+			if titleMax < minTitle {
+				return renderStacked(rows, linksSupported, colorEnabled, cols)
+			}
 		}
 	}
 	return renderTable(rows, linksSupported, colorEnabled, titleMax)
@@ -156,6 +160,73 @@ func renderTable(rows []Row, linksSupported, colorEnabled bool, titleMax int) st
 	writeHeader()
 	for i, row := range cells {
 		writeDataRow(row, rows[i])
+	}
+	return b.String()
+}
+
+// renderStacked renders each row as a block of lines, for terminals too
+// narrow for the table:
+//
+//	> team
+//	  stack  plan  age  open →
+//	  title
+//
+// Each field is truncated to fit cols, except a raw URL fallback, which is
+// left whole on its own line so it can still be copied. The stack shares
+// a line with the plan, age and link when it fits, and gets its own line
+// otherwise.
+func renderStacked(rows []Row, linksSupported, colorEnabled bool, cols int) string {
+	const indent = "  "
+	inner := max(cols-len(indent), 1)
+	var b strings.Builder
+	line := func(parts ...string) {
+		b.WriteString(indent)
+		b.WriteString(strings.Join(parts, "  "))
+		b.WriteByte('\n')
+	}
+	for i, r := range rows {
+		if i > 0 {
+			b.WriteByte('\n')
+		}
+		marker := " "
+		if r.Selected {
+			marker = ">"
+		}
+		b.WriteString(styleCell(0, marker, r, colorEnabled) + " ")
+		b.WriteString(styleCell(1, truncate(r.Team, inner), r, colorEnabled))
+		b.WriteByte('\n')
+
+		var meta []string
+		metaW := 0
+		for _, f := range []struct {
+			col  int
+			text string
+		}{{4, r.Plan}, {5, r.Age}} {
+			if f.text != "" {
+				meta = append(meta, styleCell(f.col, f.text, r, colorEnabled))
+				metaW += uniseg.StringWidth(f.text) + 2
+			}
+		}
+		if linksSupported {
+			meta = append(meta, styleCell(6, Hyperlink(r.URL, linkText), r, colorEnabled))
+			metaW += uniseg.StringWidth(linkText) + 2
+		}
+		stack := styleCell(2, truncate(r.Stack, inner), r, colorEnabled)
+		if uniseg.StringWidth(r.Stack)+metaW <= inner {
+			line(append([]string{stack}, meta...)...)
+		} else {
+			line(stack)
+			if len(meta) > 0 {
+				line(meta...)
+			}
+		}
+
+		if r.Title != "" {
+			line(styleCell(3, truncate(r.Title, inner), r, colorEnabled))
+		}
+		if !linksSupported {
+			line(r.URL)
+		}
 	}
 	return b.String()
 }

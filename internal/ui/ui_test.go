@@ -281,3 +281,61 @@ func TestRenderTable_FitsUnchanged(t *testing.T) {
 		t.Errorf("RenderTable() at a wide terminal = %q, want the unconstrained table %q", got, want)
 	}
 }
+
+var narrowRow = Row{
+	Team:     "custom-agent-tools-customer-identity-new-verticals-insurance-search",
+	Stack:    "identity-server-api-stg",
+	Title:    "[NB-4384] Add New Relic alerts for session handoff (#698)",
+	Plan:     "+2 ~2 -2",
+	Destroys: true,
+	Age:      "3m",
+	URL:      "https://example.test/stack/identity-server-api-stg/run/r1",
+	Selected: true,
+}
+
+func TestRenderTable_StacksWhenTooNarrow(t *testing.T) {
+	const cols = 50
+	got := RenderTable([]Row{narrowRow, {Team: "t", Stack: "s", Title: "x", Age: "1m", URL: "u"}}, true, false, cols)
+	if strings.Contains(got, "TITLE") {
+		t.Errorf("RenderTable() at %d cols = %q, want the stacked layout without a header", cols, got)
+	}
+	for _, l := range strings.Split(strings.TrimRight(got, "\n"), "\n") {
+		if w := uniseg.StringWidth(stripEscapes(l)); w > cols {
+			t.Errorf("line is %d cells, want <= %d: %q", w, cols, l)
+		}
+	}
+	want := "> custom-agent-tools-customer-identity-new-vertic…\n" +
+		"  identity-server-api-stg  +2 ~2 -2  3m  " + Hyperlink(narrowRow.URL, linkText) + "\n" +
+		"  [NB-4384] Add New Relic alerts for session hand…\n" +
+		"\n" +
+		"  t\n" +
+		"  s  1m  " + Hyperlink("u", linkText) + "\n" +
+		"  x\n"
+	if got != want {
+		t.Errorf("RenderTable() stacked =\n%q\nwant\n%q", got, want)
+	}
+}
+
+func TestRenderTable_StackedSplitsLongStack(t *testing.T) {
+	got := RenderTable([]Row{narrowRow}, true, false, 30)
+	lines := strings.Split(got, "\n")
+	if lines[1] != "  identity-server-api-stg" || !strings.HasPrefix(lines[2], "  +2 ~2 -2  3m  ") {
+		t.Errorf("RenderTable() = %q, want the stack on its own line when it doesn't fit beside the plan", got)
+	}
+}
+
+func TestRenderTable_StackedKeepsRawURLWhole(t *testing.T) {
+	got := RenderTable([]Row{narrowRow}, false, false, 40)
+	if !strings.Contains(got, "\n  "+narrowRow.URL+"\n") {
+		t.Errorf("RenderTable() = %q, want the untruncated URL on its own line", got)
+	}
+}
+
+func TestRenderTable_StackedColors(t *testing.T) {
+	got := RenderTable([]Row{narrowRow}, true, true, 40)
+	for _, code := range []string{BoldYellow + ">", Cyan, BoldRed + "+2 ~2 -2", Dim + "3m", Bold + "[NB-4384]"} {
+		if !strings.Contains(got, code) {
+			t.Errorf("RenderTable() stacked with color = %q, missing %q", got, code)
+		}
+	}
+}
