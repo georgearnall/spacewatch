@@ -544,10 +544,10 @@ func TestVisibleItems(t *testing.T) {
 }
 
 func TestRenderTable_EmptyMineViewHintsToggle(t *testing.T) {
-	if got := renderTable(nil, false, "a", 0, false, false); !strings.Contains(got, "a: show all team runs") {
+	if got := renderTable(nil, false, "a", 0, false, false, 0); !strings.Contains(got, "a: show all team runs") {
 		t.Errorf("renderTable() empty mine view = %q, want a hint about the toggle", got)
 	}
-	if got := renderTable(nil, true, "a", 0, false, false); !strings.Contains(got, "no pending confirmations for your team") {
+	if got := renderTable(nil, true, "a", 0, false, false, 0); !strings.Contains(got, "no pending confirmations for your team") {
 		t.Errorf("renderTable() empty team view = %q", got)
 	}
 }
