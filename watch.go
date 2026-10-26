@@ -147,7 +147,7 @@ func renderTable(items []pending.PendingConfirmation, showAll bool, toggleHint s
 	if len(items) == 0 && !showAll {
 		return fmt.Sprintf("no pending confirmations from your commits (%s: show all team runs)\n", toggleHint)
 	}
-	return ui.RenderTable(renderRows(items, selected), linksSupported, colorEnabled)
+	return ui.RenderTable(renderRows(items, selected), linksSupported, colorEnabled, 0)
 }
 
 // notifyNewlyPending sends a desktop notification for each run in

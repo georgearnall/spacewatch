@@ -50,23 +50,48 @@ func Style(s, code string, enabled bool) string {
 	return code + s + Reset
 }
 
+// Title widths for the table layout: titles are capped at maxTitle cells,
+// and may shrink to minTitle to fit a narrow terminal before RenderTable
+// gives up on the table layout.
+const (
+	maxTitle = 60
+	minTitle = 20
+)
+
 // RenderTable renders rows as an aligned table. When linksSupported is
 // true, the LINK column is an OSC 8 hyperlink; otherwise it falls back to
 // printing the raw URL so it can still be copied. When colorEnabled is
 // true, the header is bold, the TEAM column is cyan, the PLAN column is
 // red when the plan destroys anything, the AGE column is dim, and the
 // selected row's marker is highlighted.
-func RenderTable(rows []Row, linksSupported, colorEnabled bool) string {
+//
+// cols is the terminal width (0 if unknown). When the table is wider,
+// titles are truncated further to fit.
+func RenderTable(rows []Row, linksSupported, colorEnabled bool, cols int) string {
 	if len(rows) == 0 {
 		return "no pending confirmations for your team\n"
 	}
 
-	headers := []string{"", "TEAM", "STACK", "TITLE", "PLAN", "AGE", "LINK"}
+	titleMax := maxTitle
+	if cols > 0 {
+		_, widths := tableCells(rows, linksSupported, maxTitle)
+		if over := tableWidth(widths) - cols; over > 0 {
+			titleMax = max(widths[3]-over, minTitle)
+		}
+	}
+	return renderTable(rows, linksSupported, colorEnabled, titleMax)
+}
+
+var headers = []string{"", "TEAM", "STACK", "TITLE", "PLAN", "AGE", "LINK"}
+
+// tableCells lays out rows as table cells, with titles truncated to
+// titleMax cells, and returns each column's width in terminal cells. The
+// LINK column's width is that of its visible text.
+func tableCells(rows []Row, linksSupported bool, titleMax int) ([][]string, []int) {
 	widths := make([]int, len(headers))
 	for i, h := range headers {
 		widths[i] = len(h)
 	}
-
 	cells := make([][]string, len(rows))
 	for i, r := range rows {
 		link := r.URL
@@ -77,16 +102,27 @@ func RenderTable(rows []Row, linksSupported, colorEnabled bool) string {
 		if r.Selected {
 			marker = ">"
 		}
-		cells[i] = []string{marker, r.Team, r.Stack, truncate(r.Title, 60), r.Plan, r.Age, link}
-		// The LINK column is last and never padded, so its width (which
-		// includes invisible escape bytes when hyperlinked) doesn't
-		// affect alignment of the columns before it.
-		for j := 0; j < len(headers)-1; j++ {
-			if l := uniseg.StringWidth(cells[i][j]); l > widths[j] {
+		cells[i] = []string{marker, r.Team, r.Stack, truncate(r.Title, titleMax), r.Plan, r.Age, link}
+		for j, c := range cells[i] {
+			if l := uniseg.StringWidth(stripEscapes(c)); l > widths[j] {
 				widths[j] = l
 			}
 		}
 	}
+	return cells, widths
+}
+
+// tableWidth is the width of a table line with the given column widths.
+func tableWidth(widths []int) int {
+	w := 2 * (len(widths) - 1)
+	for _, cw := range widths {
+		w += cw
+	}
+	return w
+}
+
+func renderTable(rows []Row, linksSupported, colorEnabled bool, titleMax int) string {
+	cells, widths := tableCells(rows, linksSupported, titleMax)
 
 	var b strings.Builder
 
