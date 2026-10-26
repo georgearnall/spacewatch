@@ -220,18 +220,18 @@ func TestEnvSupportsLinks(t *testing.T) {
 
 func TestRenderTable_PlanColumn(t *testing.T) {
 	rows := []Row{
-		{Team: "t", Stack: "safe", Title: "x", Plan: "+1 ~2 -0", Age: "1m", URL: "u"},
-		{Team: "t", Stack: "risky", Title: "x", Plan: "+0 ~0 -3", Destroys: true, Age: "1m", URL: "u"},
+		{Team: "t", Stack: "mixed", Title: "x", Plan: &Plan{Add: 1, Change: 2, Delete: 3}, Age: "1m", URL: "u"},
+		{Team: "t", Stack: "zeros", Title: "x", Plan: &Plan{}, Age: "1m", URL: "u"},
 	}
-	got := RenderTable(rows, false, true, 0)
-	if !strings.Contains(got, "PLAN") || !strings.Contains(got, "+1 ~2 -0") {
+	if got := RenderTable(rows, false, false, 0); !strings.Contains(got, "PLAN") || !strings.Contains(got, "+1 ~2 -3") || !strings.Contains(got, "+0 ~0 -0") {
 		t.Errorf("RenderTable() missing PLAN column: %q", got)
 	}
-	if !strings.Contains(got, BoldRed+"+0 ~0 -3") {
-		t.Errorf("RenderTable() did not highlight a destroying plan in red: %q", got)
+	got := RenderTable(rows, false, true, 0)
+	if want := Green + "+1" + Reset + " " + Yellow + "~2" + Reset + " " + Red + "-3" + Reset; !strings.Contains(got, want) {
+		t.Errorf("RenderTable() = %q, want plan colored per count as %q", got, want)
 	}
-	if strings.Contains(got, BoldRed+"+1 ~2 -0") {
-		t.Errorf("RenderTable() highlighted a non-destroying plan: %q", got)
+	if !strings.Contains(got, "+0 ~0 -0") {
+		t.Errorf("RenderTable() = %q, want zero counts left uncolored", got)
 	}
 }
 
@@ -261,7 +261,7 @@ func TestEndsAtMargin(t *testing.T) {
 }
 
 func TestRenderTable_ShrinksTitleToFit(t *testing.T) {
-	rows := []Row{{Team: "team", Stack: "stack", Title: strings.Repeat("x", 80), Plan: "+1 ~0 -0", Age: "3m", URL: "u"}}
+	rows := []Row{{Team: "team", Stack: "stack", Title: strings.Repeat("x", 80), Plan: &Plan{Add: 1}, Age: "3m", URL: "u"}}
 	wide := RenderTable(rows, true, true, 0)
 	cols := uniseg.StringWidth(stripEscapes(strings.SplitN(wide, "\n", 3)[1])) - 15
 	got := RenderTable(rows, true, true, cols)
@@ -286,8 +286,7 @@ var narrowRow = Row{
 	Team:     "custom-agent-tools-customer-identity-new-verticals-insurance-search",
 	Stack:    "identity-server-api-stg",
 	Title:    "[NB-4384] Add New Relic alerts for session handoff (#698)",
-	Plan:     "+2 ~2 -2",
-	Destroys: true,
+	Plan:     &Plan{Add: 2, Change: 2, Delete: 2},
 	Age:      "3m",
 	URL:      "https://example.test/stack/identity-server-api-stg/run/r1",
 	Selected: true,
@@ -333,7 +332,7 @@ func TestRenderTable_StackedKeepsRawURLWhole(t *testing.T) {
 
 func TestRenderTable_StackedColors(t *testing.T) {
 	got := RenderTable([]Row{narrowRow}, true, true, 40)
-	for _, code := range []string{BoldYellow + ">", Cyan, BoldRed + "+2 ~2 -2", Dim + "3m", Bold + "[NB-4384]"} {
+	for _, code := range []string{BoldYellow + ">", Cyan, Green + "+2", Yellow + "~2", Red + "-2", Dim + "3m", Bold + "[NB-4384]"} {
 		if !strings.Contains(got, code) {
 			t.Errorf("RenderTable() stacked with color = %q, missing %q", got, code)
 		}
