@@ -6,6 +6,7 @@ package ui
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -19,11 +20,40 @@ type Row struct {
 	Team     string
 	Stack    string
 	Title    string
-	Plan     string // e.g. "+2 ~3 -1", or "" if unknown
-	Destroys bool   // the plan destroys at least one resource
+	Plan     *Plan // nil if unknown
 	Age      string
 	URL      string
 	Selected bool
+}
+
+// Plan is a run's planned resource changes.
+type Plan struct {
+	Add, Change, Delete int
+}
+
+// String formats p as e.g. "+2 ~3 -1".
+func (p Plan) String() string {
+	return fmt.Sprintf("+%d ~%d -%d", p.Add, p.Change, p.Delete)
+}
+
+// styled formats p like String, coloring each non-zero count: additions
+// green, changes amber and deletions red.
+func (p Plan) styled() string {
+	part := func(sign string, n int, code string) string {
+		s := sign + strconv.Itoa(n)
+		if n == 0 {
+			return s
+		}
+		return Style(s, code, true)
+	}
+	return part("+", p.Add, Green) + " " + part("~", p.Change, Yellow) + " " + part("-", p.Delete, Red)
+}
+
+func (r Row) planText() string {
+	if r.Plan == nil {
+		return ""
+	}
+	return r.Plan.String()
 }
 
 const linkText = "open →"
@@ -37,6 +67,9 @@ const (
 	Bold       = "\x1b[1m"
 	Dim        = "\x1b[2m"
 	Cyan       = "\x1b[36m"
+	Red        = "\x1b[31m"
+	Green      = "\x1b[32m"
+	Yellow     = "\x1b[33m"
 	BoldRed    = "\x1b[1;31m"
 	BoldYellow = "\x1b[1;33m"
 )
@@ -61,8 +94,8 @@ const (
 // RenderTable renders rows as an aligned table. When linksSupported is
 // true, the LINK column is an OSC 8 hyperlink; otherwise it falls back to
 // printing the raw URL so it can still be copied. When colorEnabled is
-// true, the header is bold, the TEAM column is cyan, the PLAN column is
-// red when the plan destroys anything, the AGE column is dim, and the
+// true, the header is bold, the TEAM column is cyan, the PLAN column's
+// additions are green, changes amber and deletions red, the AGE column is dim, and the
 // selected row's marker is highlighted.
 //
 // cols is the terminal width (0 if unknown). When the table is wider,
@@ -106,7 +139,7 @@ func tableCells(rows []Row, linksSupported bool, titleMax int) ([][]string, []in
 		if r.Selected {
 			marker = ">"
 		}
-		cells[i] = []string{marker, r.Team, r.Stack, truncate(r.Title, titleMax), r.Plan, r.Age, link}
+		cells[i] = []string{marker, r.Team, r.Stack, truncate(r.Title, titleMax), r.planText(), r.Age, link}
 		for j, c := range cells[i] {
 			if l := uniseg.StringWidth(stripEscapes(c)); l > widths[j] {
 				widths[j] = l
@@ -201,7 +234,7 @@ func renderStacked(rows []Row, linksSupported, colorEnabled bool, cols int) stri
 		for _, f := range []struct {
 			col  int
 			text string
-		}{{4, r.Plan}, {5, r.Age}} {
+		}{{4, r.planText()}, {5, r.Age}} {
 			if f.text != "" {
 				meta = append(meta, styleCell(f.col, f.text, r, colorEnabled))
 				metaW += uniseg.StringWidth(f.text) + 2
@@ -231,8 +264,8 @@ func renderStacked(rows []Row, linksSupported, colorEnabled bool, cols int) stri
 	return b.String()
 }
 
-// styleCell applies per-column coloring: TEAM is cyan, PLAN is red when it
-// destroys anything, AGE is dim, the
+// styleCell applies per-column coloring: TEAM is cyan, PLAN counts are
+// green, amber and red for additions, changes and deletions, AGE is dim, the
 // marker is highlighted when its row is selected, and the remaining
 // columns are bolded on the selected row for a full-row highlight.
 func styleCell(col int, s string, r Row, colorEnabled bool) string {
@@ -248,10 +281,11 @@ func styleCell(col int, s string, r Row, colorEnabled bool) string {
 	case 1: // team
 		return Style(s, Cyan, true)
 	case 4: // plan
-		if r.Destroys {
-			return Style(s, BoldRed, true)
+		if r.Plan == nil {
+			return s
 		}
-		return s
+		// s may carry trailing padding after the plan text.
+		return r.Plan.styled() + strings.TrimPrefix(s, r.Plan.String())
 	case 5: // age
 		return Style(s, Dim, true)
 	default:
