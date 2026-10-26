@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/rivo/uniseg"
 )
 
 func TestFormatAge(t *testing.T) {
@@ -24,7 +26,7 @@ func TestFormatAge(t *testing.T) {
 }
 
 func TestRenderTable_NoRows(t *testing.T) {
-	got := RenderTable(nil, true, false)
+	got := RenderTable(nil, true, false, 0)
 	if !strings.Contains(got, "no pending confirmations") {
 		t.Errorf("RenderTable(nil) = %q, want an empty-state message", got)
 	}
@@ -32,7 +34,7 @@ func TestRenderTable_NoRows(t *testing.T) {
 
 func TestRenderTable_LinksSupported(t *testing.T) {
 	rows := []Row{{Team: "ecommerce", Stack: "orders-api", Title: "apply", Age: "5m", URL: "https://example.test/stack/orders-api/run/r1"}}
-	got := RenderTable(rows, true, false)
+	got := RenderTable(rows, true, false, 0)
 	if !strings.Contains(got, "\x1b]8;;https://example.test/stack/orders-api/run/r1\x1b\\") {
 		t.Errorf("RenderTable() with links supported missing OSC 8 escape sequence: %q", got)
 	}
@@ -43,7 +45,7 @@ func TestRenderTable_LinksSupported(t *testing.T) {
 
 func TestRenderTable_LinksUnsupported(t *testing.T) {
 	rows := []Row{{Team: "ecommerce", Stack: "orders-api", Title: "apply", Age: "5m", URL: "https://example.test/stack/orders-api/run/r1"}}
-	got := RenderTable(rows, false, false)
+	got := RenderTable(rows, false, false, 0)
 	if strings.Contains(got, "\x1b]8;;") {
 		t.Errorf("RenderTable() with links unsupported should not contain OSC 8 escapes: %q", got)
 	}
@@ -57,7 +59,7 @@ func TestRenderTable_ColumnsAlign(t *testing.T) {
 		{Team: "e", Stack: "short", Title: "t", Age: "1m", URL: "u"},
 		{Team: "ecommerce-long-name", Stack: "s", Title: "t", Age: "1m", URL: "u"},
 	}
-	got := RenderTable(rows, false, false)
+	got := RenderTable(rows, false, false, 0)
 	lines := strings.Split(strings.TrimRight(got, "\n"), "\n")
 	if len(lines) != 3 { // header + 2 rows
 		t.Fatalf("RenderTable() produced %d lines, want 3", len(lines))
@@ -78,7 +80,7 @@ func TestRenderTable_ColumnsAlign_WithColorEnabled(t *testing.T) {
 		{Team: "e", Stack: "short", Title: "t", Age: "1m", URL: "u"},
 		{Team: "ecommerce-long-name", Stack: "s", Title: "t", Age: "1m", URL: "u", Selected: true},
 	}
-	got := RenderTable(rows, false, true)
+	got := RenderTable(rows, false, true, 0)
 	lines := strings.Split(strings.TrimRight(got, "\n"), "\n")
 	if len(lines) != 3 {
 		t.Fatalf("RenderTable() produced %d lines, want 3", len(lines))
@@ -96,9 +98,25 @@ func TestRenderTable_ColumnsAlign_WithColorEnabled(t *testing.T) {
 	}
 }
 
+func TestRenderTable_ColumnsAlign_ByDisplayWidth(t *testing.T) {
+	// A truncated title ends in a 3-byte, 1-cell "…", and the stack name
+	// contains wide characters, so byte-length padding would misalign.
+	rows := []Row{
+		{Team: "e", Stack: "日本", Title: strings.Repeat("x", 80), Age: "1m", URL: "u"},
+		{Team: "e", Stack: "s", Title: "t", Age: "1m", URL: "u"},
+	}
+	lines := strings.Split(strings.TrimRight(RenderTable(rows, false, false, 0), "\n"), "\n")
+	want := uniseg.StringWidth(lines[0][:strings.Index(lines[0], "LINK")])
+	for i, l := range lines[1:] {
+		if got := uniseg.StringWidth(l[:strings.LastIndex(l, "u")]); got != want {
+			t.Errorf("row %d: LINK column at cell %d, want %d\n%q", i, got, want, l)
+		}
+	}
+}
+
 func TestRenderTable_ColorEnabled(t *testing.T) {
 	rows := []Row{{Team: "ecommerce", Stack: "orders-api", Title: "apply", Age: "5m", URL: "u", Selected: true}}
-	got := RenderTable(rows, false, true)
+	got := RenderTable(rows, false, true, 0)
 	if !strings.Contains(got, Bold) {
 		t.Errorf("RenderTable() with color enabled missing bold header/selection: %q", got)
 	}
@@ -115,7 +133,7 @@ func TestRenderTable_ColorEnabled(t *testing.T) {
 
 func TestRenderTable_ColorDisabled_NoEscapeCodes(t *testing.T) {
 	rows := []Row{{Team: "ecommerce", Stack: "orders-api", Title: "apply", Age: "5m", URL: "u", Selected: true}}
-	got := RenderTable(rows, false, false)
+	got := RenderTable(rows, false, false, 0)
 	if strings.Contains(got, "\x1b[") {
 		t.Errorf("RenderTable() with color disabled contains an escape code: %q", got)
 	}
@@ -157,11 +175,15 @@ func TestTruncate(t *testing.T) {
 		t.Errorf("truncate(short) = %q, want unchanged", got)
 	}
 	got := truncate("this is a long title that exceeds the limit", 10)
-	if len([]rune(got)) > 10 {
-		t.Errorf("truncate() = %q, exceeds max length 10 runes", got)
+	if uniseg.StringWidth(got) != 10 {
+		t.Errorf("truncate() = %q, want exactly 10 cells", got)
 	}
 	if !strings.HasSuffix(got, "…") {
 		t.Errorf("truncate() = %q, want ellipsis suffix", got)
+	}
+	// A wide character that would straddle the limit is dropped whole.
+	if got := truncate("ab日本語", 5); got != "ab日…" {
+		t.Errorf("truncate(wide) = %q, want %q", got, "ab日…")
 	}
 }
 
@@ -201,7 +223,7 @@ func TestRenderTable_PlanColumn(t *testing.T) {
 		{Team: "t", Stack: "safe", Title: "x", Plan: "+1 ~2 -0", Age: "1m", URL: "u"},
 		{Team: "t", Stack: "risky", Title: "x", Plan: "+0 ~0 -3", Destroys: true, Age: "1m", URL: "u"},
 	}
-	got := RenderTable(rows, false, true)
+	got := RenderTable(rows, false, true, 0)
 	if !strings.Contains(got, "PLAN") || !strings.Contains(got, "+1 ~2 -0") {
 		t.Errorf("RenderTable() missing PLAN column: %q", got)
 	}
@@ -234,6 +256,86 @@ func TestEndsAtMargin(t *testing.T) {
 	for _, c := range cases {
 		if got := EndsAtMargin(c.in, c.cols); got != c.want {
 			t.Errorf("%s: EndsAtMargin(%q, %d) = %v, want %v", c.name, c.in, c.cols, got, c.want)
+		}
+	}
+}
+
+func TestRenderTable_ShrinksTitleToFit(t *testing.T) {
+	rows := []Row{{Team: "team", Stack: "stack", Title: strings.Repeat("x", 80), Plan: "+1 ~0 -0", Age: "3m", URL: "u"}}
+	wide := RenderTable(rows, true, true, 0)
+	cols := uniseg.StringWidth(stripEscapes(strings.SplitN(wide, "\n", 3)[1])) - 15
+	got := RenderTable(rows, true, true, cols)
+	for _, l := range strings.Split(strings.TrimRight(got, "\n"), "\n") {
+		if w := uniseg.StringWidth(stripEscapes(l)); w > cols {
+			t.Errorf("line is %d cells, want <= %d: %q", w, cols, l)
+		}
+	}
+	if !strings.Contains(got, "TITLE") || !strings.Contains(got, "…") {
+		t.Errorf("RenderTable() = %q, want a table with a truncated title", got)
+	}
+}
+
+func TestRenderTable_FitsUnchanged(t *testing.T) {
+	rows := []Row{{Team: "team", Stack: "stack", Title: "title", Age: "3m", URL: "u"}}
+	if got, want := RenderTable(rows, true, true, 200), RenderTable(rows, true, true, 0); got != want {
+		t.Errorf("RenderTable() at a wide terminal = %q, want the unconstrained table %q", got, want)
+	}
+}
+
+var narrowRow = Row{
+	Team:     "custom-agent-tools-customer-identity-new-verticals-insurance-search",
+	Stack:    "identity-server-api-stg",
+	Title:    "[NB-4384] Add New Relic alerts for session handoff (#698)",
+	Plan:     "+2 ~2 -2",
+	Destroys: true,
+	Age:      "3m",
+	URL:      "https://example.test/stack/identity-server-api-stg/run/r1",
+	Selected: true,
+}
+
+func TestRenderTable_StacksWhenTooNarrow(t *testing.T) {
+	const cols = 50
+	got := RenderTable([]Row{narrowRow, {Team: "t", Stack: "s", Title: "x", Age: "1m", URL: "u"}}, true, false, cols)
+	if strings.Contains(got, "TITLE") {
+		t.Errorf("RenderTable() at %d cols = %q, want the stacked layout without a header", cols, got)
+	}
+	for _, l := range strings.Split(strings.TrimRight(got, "\n"), "\n") {
+		if w := uniseg.StringWidth(stripEscapes(l)); w > cols {
+			t.Errorf("line is %d cells, want <= %d: %q", w, cols, l)
+		}
+	}
+	want := "> custom-agent-tools-customer-identity-new-vertic…\n" +
+		"  identity-server-api-stg  +2 ~2 -2  3m  " + Hyperlink(narrowRow.URL, linkText) + "\n" +
+		"  [NB-4384] Add New Relic alerts for session hand…\n" +
+		"\n" +
+		"  t\n" +
+		"  s  1m  " + Hyperlink("u", linkText) + "\n" +
+		"  x\n"
+	if got != want {
+		t.Errorf("RenderTable() stacked =\n%q\nwant\n%q", got, want)
+	}
+}
+
+func TestRenderTable_StackedSplitsLongStack(t *testing.T) {
+	got := RenderTable([]Row{narrowRow}, true, false, 30)
+	lines := strings.Split(got, "\n")
+	if lines[1] != "  identity-server-api-stg" || !strings.HasPrefix(lines[2], "  +2 ~2 -2  3m  ") {
+		t.Errorf("RenderTable() = %q, want the stack on its own line when it doesn't fit beside the plan", got)
+	}
+}
+
+func TestRenderTable_StackedKeepsRawURLWhole(t *testing.T) {
+	got := RenderTable([]Row{narrowRow}, false, false, 40)
+	if !strings.Contains(got, "\n  "+narrowRow.URL+"\n") {
+		t.Errorf("RenderTable() = %q, want the untruncated URL on its own line", got)
+	}
+}
+
+func TestRenderTable_StackedColors(t *testing.T) {
+	got := RenderTable([]Row{narrowRow}, true, true, 40)
+	for _, code := range []string{BoldYellow + ">", Cyan, BoldRed + "+2 ~2 -2", Dim + "3m", Bold + "[NB-4384]"} {
+		if !strings.Contains(got, code) {
+			t.Errorf("RenderTable() stacked with color = %q, missing %q", got, code)
 		}
 	}
 }

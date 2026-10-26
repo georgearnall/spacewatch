@@ -142,12 +142,12 @@ func visibleItems(items []pending.PendingConfirmation, viewer string, showAll bo
 
 // renderTable renders the visible runs, with an empty-state message that
 // says which view is active and how to switch (toggleHint, e.g. "a" or
-// "--all").
-func renderTable(items []pending.PendingConfirmation, showAll bool, toggleHint string, selected int, linksSupported, colorEnabled bool) string {
+// "--all"). cols is the terminal width, 0 if unknown.
+func renderTable(items []pending.PendingConfirmation, showAll bool, toggleHint string, selected int, linksSupported, colorEnabled bool, cols int) string {
 	if len(items) == 0 && !showAll {
 		return fmt.Sprintf("no pending confirmations from your commits (%s: show all team runs)\n", toggleHint)
 	}
-	return ui.RenderTable(renderRows(items, selected), linksSupported, colorEnabled)
+	return ui.RenderTable(renderRows(items, selected), linksSupported, colorEnabled, cols)
 }
 
 // notifyNewlyPending sends a desktop notification for each run in
@@ -401,7 +401,7 @@ func runOnce(ctx context.Context, c *spaceclient.Client, cfg config) {
 
 	linksSupported := ui.SupportsLinks()
 	colorEnabled := ui.ColorEnabled()
-	fmt.Print(renderTable(res.items, cfg.all, "--all", -1, linksSupported, colorEnabled))
+	fmt.Print(renderTable(res.items, cfg.all, "--all", -1, linksSupported, colorEnabled, ui.TerminalWidth()))
 	fmt.Print(ui.Style(footer(res.polledAt, len(res.items), 0), ui.Dim, colorEnabled))
 }
 
@@ -443,6 +443,7 @@ func runWatch(ctx context.Context, c *spaceclient.Client, cfg config) {
 	)
 
 	redraw := func() {
+		cols := ui.TerminalWidth()
 		var b strings.Builder
 		if configOpen {
 			b.WriteString(renderConfig(cfg, viewer, showAll, notifier, last, colorEnabled))
@@ -457,7 +458,7 @@ func runWatch(ctx context.Context, c *spaceclient.Client, cfg config) {
 			case last.err != nil:
 				b.WriteString(ui.Style(fmt.Sprintf("spacewatch: poll error (retrying): %v\n\n", last.err), ui.BoldRed, colorEnabled))
 			}
-			b.WriteString(renderTable(view, showAll, "a", selected, linksSupported, colorEnabled))
+			b.WriteString(renderTable(view, showAll, "a", selected, linksSupported, colorEnabled, cols))
 			b.WriteString("\n")
 			b.WriteString(ui.Style(keyHints(showAll, last.authExpired), ui.Dim, colorEnabled))
 			if !last.polledAt.IsZero() {
@@ -471,7 +472,7 @@ func runWatch(ctx context.Context, c *spaceclient.Client, cfg config) {
 		// continues from whatever column the previous line ended at
 		// instead of resetting to column 0. Normalize to "\r\n" so this
 		// renders correctly regardless of OPOST state.
-		out := frame(b.String(), ui.TerminalWidth())
+		out := frame(b.String(), cols)
 		if fullClear {
 			out = ansiClearScreen + out
 			fullClear = false

@@ -50,23 +50,52 @@ func Style(s, code string, enabled bool) string {
 	return code + s + Reset
 }
 
+// Title widths for the table layout: titles are capped at maxTitle cells,
+// and may shrink to minTitle to fit a narrow terminal before RenderTable
+// gives up on the table layout.
+const (
+	maxTitle = 60
+	minTitle = 20
+)
+
 // RenderTable renders rows as an aligned table. When linksSupported is
 // true, the LINK column is an OSC 8 hyperlink; otherwise it falls back to
 // printing the raw URL so it can still be copied. When colorEnabled is
 // true, the header is bold, the TEAM column is cyan, the PLAN column is
 // red when the plan destroys anything, the AGE column is dim, and the
 // selected row's marker is highlighted.
-func RenderTable(rows []Row, linksSupported, colorEnabled bool) string {
+//
+// cols is the terminal width (0 if unknown). When the table is wider,
+// titles are truncated further to fit, and if that isn't enough each row
+// is stacked over several lines instead.
+func RenderTable(rows []Row, linksSupported, colorEnabled bool, cols int) string {
 	if len(rows) == 0 {
 		return "no pending confirmations for your team\n"
 	}
 
-	headers := []string{"", "TEAM", "STACK", "TITLE", "PLAN", "AGE", "LINK"}
+	titleMax := maxTitle
+	if cols > 0 {
+		_, widths := tableCells(rows, linksSupported, maxTitle)
+		if over := tableWidth(widths) - cols; over > 0 {
+			titleMax = widths[3] - over
+			if titleMax < minTitle {
+				return renderStacked(rows, linksSupported, colorEnabled, cols)
+			}
+		}
+	}
+	return renderTable(rows, linksSupported, colorEnabled, titleMax)
+}
+
+var headers = []string{"", "TEAM", "STACK", "TITLE", "PLAN", "AGE", "LINK"}
+
+// tableCells lays out rows as table cells, with titles truncated to
+// titleMax cells, and returns each column's width in terminal cells. The
+// LINK column's width is that of its visible text.
+func tableCells(rows []Row, linksSupported bool, titleMax int) ([][]string, []int) {
 	widths := make([]int, len(headers))
 	for i, h := range headers {
 		widths[i] = len(h)
 	}
-
 	cells := make([][]string, len(rows))
 	for i, r := range rows {
 		link := r.URL
@@ -77,16 +106,27 @@ func RenderTable(rows []Row, linksSupported, colorEnabled bool) string {
 		if r.Selected {
 			marker = ">"
 		}
-		cells[i] = []string{marker, r.Team, r.Stack, truncate(r.Title, 60), r.Plan, r.Age, link}
-		// The LINK column is last and never padded, so its width (which
-		// includes invisible escape bytes when hyperlinked) doesn't
-		// affect alignment of the columns before it.
-		for j := 0; j < len(headers)-1; j++ {
-			if l := len(cells[i][j]); l > widths[j] {
+		cells[i] = []string{marker, r.Team, r.Stack, truncate(r.Title, titleMax), r.Plan, r.Age, link}
+		for j, c := range cells[i] {
+			if l := uniseg.StringWidth(stripEscapes(c)); l > widths[j] {
 				widths[j] = l
 			}
 		}
 	}
+	return cells, widths
+}
+
+// tableWidth is the width of a table line with the given column widths.
+func tableWidth(widths []int) int {
+	w := 2 * (len(widths) - 1)
+	for _, cw := range widths {
+		w += cw
+	}
+	return w
+}
+
+func renderTable(rows []Row, linksSupported, colorEnabled bool, titleMax int) string {
+	cells, widths := tableCells(rows, linksSupported, titleMax)
 
 	var b strings.Builder
 
@@ -94,7 +134,7 @@ func RenderTable(rows []Row, linksSupported, colorEnabled bool) string {
 		for i, h := range headers {
 			cell := h
 			if i != len(headers)-1 {
-				cell = fmt.Sprintf("%-*s", widths[i], h)
+				cell = pad(h, widths[i])
 			}
 			b.WriteString(Style(cell, Bold, colorEnabled))
 			if i != len(headers)-1 {
@@ -110,7 +150,7 @@ func RenderTable(rows []Row, linksSupported, colorEnabled bool) string {
 				b.WriteString(styleCell(i, c, r, colorEnabled))
 				continue
 			}
-			padded := fmt.Sprintf("%-*s", widths[i], c)
+			padded := pad(c, widths[i])
 			b.WriteString(styleCell(i, padded, r, colorEnabled))
 			b.WriteString("  ")
 		}
@@ -120,6 +160,73 @@ func RenderTable(rows []Row, linksSupported, colorEnabled bool) string {
 	writeHeader()
 	for i, row := range cells {
 		writeDataRow(row, rows[i])
+	}
+	return b.String()
+}
+
+// renderStacked renders each row as a block of lines, for terminals too
+// narrow for the table:
+//
+//	> team
+//	  stack  plan  age  open →
+//	  title
+//
+// Each field is truncated to fit cols, except a raw URL fallback, which is
+// left whole on its own line so it can still be copied. The stack shares
+// a line with the plan, age and link when it fits, and gets its own line
+// otherwise.
+func renderStacked(rows []Row, linksSupported, colorEnabled bool, cols int) string {
+	const indent = "  "
+	inner := max(cols-len(indent), 1)
+	var b strings.Builder
+	line := func(parts ...string) {
+		b.WriteString(indent)
+		b.WriteString(strings.Join(parts, "  "))
+		b.WriteByte('\n')
+	}
+	for i, r := range rows {
+		if i > 0 {
+			b.WriteByte('\n')
+		}
+		marker := " "
+		if r.Selected {
+			marker = ">"
+		}
+		b.WriteString(styleCell(0, marker, r, colorEnabled) + " ")
+		b.WriteString(styleCell(1, truncate(r.Team, inner), r, colorEnabled))
+		b.WriteByte('\n')
+
+		var meta []string
+		metaW := 0
+		for _, f := range []struct {
+			col  int
+			text string
+		}{{4, r.Plan}, {5, r.Age}} {
+			if f.text != "" {
+				meta = append(meta, styleCell(f.col, f.text, r, colorEnabled))
+				metaW += uniseg.StringWidth(f.text) + 2
+			}
+		}
+		if linksSupported {
+			meta = append(meta, styleCell(6, Hyperlink(r.URL, linkText), r, colorEnabled))
+			metaW += uniseg.StringWidth(linkText) + 2
+		}
+		stack := styleCell(2, truncate(r.Stack, inner), r, colorEnabled)
+		if uniseg.StringWidth(r.Stack)+metaW <= inner {
+			line(append([]string{stack}, meta...)...)
+		} else {
+			line(stack)
+			if len(meta) > 0 {
+				line(meta...)
+			}
+		}
+
+		if r.Title != "" {
+			line(styleCell(3, truncate(r.Title, inner), r, colorEnabled))
+		}
+		if !linksSupported {
+			line(r.URL)
+		}
 	}
 	return b.String()
 }
@@ -155,15 +262,35 @@ func styleCell(col int, s string, r Row, colorEnabled bool) string {
 	}
 }
 
+// truncate shortens s to at most max terminal cells, ending in "…" when
+// anything was cut.
 func truncate(s string, max int) string {
-	r := []rune(s)
-	if len(r) <= max {
+	if uniseg.StringWidth(s) <= max {
 		return s
 	}
-	if max <= 1 {
-		return string(r[:max])
+	if max <= 0 {
+		return ""
 	}
-	return string(r[:max-1]) + "…"
+	var b strings.Builder
+	w := 0
+	gr := uniseg.NewGraphemes(s)
+	for gr.Next() {
+		gw := gr.Width()
+		if w+gw > max-1 {
+			break
+		}
+		b.WriteString(gr.Str())
+		w += gw
+	}
+	return b.String() + "…"
+}
+
+// pad right-pads s with spaces to w terminal cells.
+func pad(s string, w int) string {
+	if n := w - uniseg.StringWidth(s); n > 0 {
+		return s + strings.Repeat(" ", n)
+	}
+	return s
 }
 
 // FormatAge renders a duration as a short, human-scaled age like "3m",
