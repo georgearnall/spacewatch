@@ -20,13 +20,13 @@ func TestResolveTeamLabels_ExplicitTeamLabelSkipsConfig(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 
 	cfg := config{}
-	cfg.teamLabels.values = []string{"folder:owning-team/atlas"}
+	cfg.teamLabels.values = []string{"folder:owning-team/payments"}
 	cfg.teamLabels.userSet = true
 
 	if err := resolveTeamLabels(&cfg, failIfCalled(t)); err != nil {
 		t.Fatalf("resolveTeamLabels() error = %v", err)
 	}
-	if len(cfg.teamLabels.values) != 1 || cfg.teamLabels.values[0] != "folder:owning-team/atlas" {
+	if len(cfg.teamLabels.values) != 1 || cfg.teamLabels.values[0] != "folder:owning-team/payments" {
 		t.Errorf("teamLabels.values = %v, want unchanged explicit override", cfg.teamLabels.values)
 	}
 }
@@ -34,7 +34,7 @@ func TestResolveTeamLabels_ExplicitTeamLabelSkipsConfig(t *testing.T) {
 func TestResolveTeamLabels_LoadsPersistedTeam(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 
-	if err := (&teamconfig.Config{Teams: []string{"ecommerce"}}).Save(); err != nil {
+	if err := (&teamconfig.Config{Teams: []string{"checkout"}}).Save(); err != nil {
 		t.Fatalf("seeding team config: %v", err)
 	}
 
@@ -43,7 +43,7 @@ func TestResolveTeamLabels_LoadsPersistedTeam(t *testing.T) {
 		t.Fatalf("resolveTeamLabels() error = %v", err)
 	}
 
-	want := []string{"folder:owning-team/ecommerce", "folder:collab-team/ecommerce"}
+	want := []string{"folder:owning-team/checkout", "folder:collab-team/checkout"}
 	if len(cfg.teamLabels.values) != len(want) {
 		t.Fatalf("teamLabels.values = %v, want %v", cfg.teamLabels.values, want)
 	}
@@ -61,7 +61,7 @@ func TestResolveTeamLabels_PromptsAndPersistsOnFirstRun(t *testing.T) {
 	prompted := false
 	prompt := func([]string) ([]string, error) {
 		prompted = true
-		return []string{"ecommerce"}, nil
+		return []string{"checkout"}, nil
 	}
 
 	if err := resolveTeamLabels(&cfg, prompt); err != nil {
@@ -71,7 +71,7 @@ func TestResolveTeamLabels_PromptsAndPersistsOnFirstRun(t *testing.T) {
 		t.Error("resolveTeamLabels() did not call prompt when nothing was configured")
 	}
 
-	want := []string{"folder:owning-team/ecommerce", "folder:collab-team/ecommerce"}
+	want := []string{"folder:owning-team/checkout", "folder:collab-team/checkout"}
 	if len(cfg.teamLabels.values) != len(want) {
 		t.Fatalf("teamLabels.values = %v, want %v", cfg.teamLabels.values, want)
 	}
@@ -80,24 +80,24 @@ func TestResolveTeamLabels_PromptsAndPersistsOnFirstRun(t *testing.T) {
 	if err != nil {
 		t.Fatalf("teamconfig.Load() error = %v", err)
 	}
-	if !slices.Equal(tc.Teams, []string{"ecommerce"}) {
-		t.Errorf("persisted Teams = %v, want [ecommerce]", tc.Teams)
+	if !slices.Equal(tc.Teams, []string{"checkout"}) {
+		t.Errorf("persisted Teams = %v, want [checkout]", tc.Teams)
 	}
 }
 
 func TestResolveTeamLabels_TeamFlagOverwritesPersisted(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 
-	if err := (&teamconfig.Config{Teams: []string{"ecommerce"}}).Save(); err != nil {
+	if err := (&teamconfig.Config{Teams: []string{"checkout"}}).Save(); err != nil {
 		t.Fatalf("seeding team config: %v", err)
 	}
 
-	cfg := config{team: "atlas"}
+	cfg := config{team: "payments"}
 	if err := resolveTeamLabels(&cfg, failIfCalled(t)); err != nil {
 		t.Fatalf("resolveTeamLabels() error = %v", err)
 	}
 
-	want := []string{"folder:owning-team/atlas", "folder:collab-team/atlas"}
+	want := []string{"folder:owning-team/payments", "folder:collab-team/payments"}
 	if len(cfg.teamLabels.values) != len(want) || cfg.teamLabels.values[0] != want[0] {
 		t.Errorf("teamLabels.values = %v, want %v", cfg.teamLabels.values, want)
 	}
@@ -106,8 +106,8 @@ func TestResolveTeamLabels_TeamFlagOverwritesPersisted(t *testing.T) {
 	if err != nil {
 		t.Fatalf("teamconfig.Load() error = %v", err)
 	}
-	if !slices.Equal(tc.Teams, []string{"atlas"}) {
-		t.Errorf("persisted Teams = %v, want [atlas] (--team should overwrite)", tc.Teams)
+	if !slices.Equal(tc.Teams, []string{"payments"}) {
+		t.Errorf("persisted Teams = %v, want [payments] (--team should overwrite)", tc.Teams)
 	}
 }
 
@@ -135,14 +135,14 @@ func TestResolveTeamLabels_PromptErrorPropagatesAndSavesNothing(t *testing.T) {
 func TestResolveTeamLabels_TeamFlagAcceptsList(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 
-	cfg := config{team: "atlas, ecommerce"}
+	cfg := config{team: "payments, checkout"}
 	if err := resolveTeamLabels(&cfg, failIfCalled(t)); err != nil {
 		t.Fatalf("resolveTeamLabels() error = %v", err)
 	}
 
 	want := []string{
-		"folder:owning-team/atlas", "folder:collab-team/atlas",
-		"folder:owning-team/ecommerce", "folder:collab-team/ecommerce",
+		"folder:owning-team/payments", "folder:collab-team/payments",
+		"folder:owning-team/checkout", "folder:collab-team/checkout",
 	}
 	if !slices.Equal(cfg.teamLabels.values, want) {
 		t.Errorf("teamLabels.values = %v, want %v", cfg.teamLabels.values, want)
@@ -152,29 +152,29 @@ func TestResolveTeamLabels_TeamFlagAcceptsList(t *testing.T) {
 func TestResolveTeamLabels_PickTeamRepicksWithCurrentTeams(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 
-	if err := (&teamconfig.Config{Teams: []string{"ecommerce"}}).Save(); err != nil {
+	if err := (&teamconfig.Config{Teams: []string{"checkout"}}).Save(); err != nil {
 		t.Fatalf("seeding team config: %v", err)
 	}
 
 	var gotCurrent []string
 	pick := func(current []string) ([]string, error) {
 		gotCurrent = current
-		return []string{"atlas"}, nil
+		return []string{"payments"}, nil
 	}
 	cfg := config{pickTeam: true}
 	if err := resolveTeamLabels(&cfg, pick); err != nil {
 		t.Fatalf("resolveTeamLabels() error = %v", err)
 	}
-	if !slices.Equal(gotCurrent, []string{"ecommerce"}) {
-		t.Errorf("pick got current = %v, want [ecommerce]", gotCurrent)
+	if !slices.Equal(gotCurrent, []string{"checkout"}) {
+		t.Errorf("pick got current = %v, want [checkout]", gotCurrent)
 	}
 
 	tc, err := teamconfig.Load()
 	if err != nil {
 		t.Fatalf("teamconfig.Load() error = %v", err)
 	}
-	if !slices.Equal(tc.Teams, []string{"atlas"}) {
-		t.Errorf("persisted Teams = %v, want [atlas]", tc.Teams)
+	if !slices.Equal(tc.Teams, []string{"payments"}) {
+		t.Errorf("persisted Teams = %v, want [payments]", tc.Teams)
 	}
 }
 

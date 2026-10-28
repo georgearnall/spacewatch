@@ -56,18 +56,18 @@ func TestNextInterval_ZeroBudgetDisablesFloor(t *testing.T) {
 func TestRenderRows(t *testing.T) {
 	now := time.Now()
 	items := []pending.PendingConfirmation{
-		{RunID: "r1", StackName: "orders-api", SpaceName: "ecommerce", Title: "apply", CreatedAt: now.Add(-5 * time.Minute), RunURL: "https://x/1"},
-		{RunID: "r2", StackName: "no-space", MatchedLabel: "folder:owning-team/ecommerce", Title: "apply", CreatedAt: now.Add(-time.Hour), RunURL: "https://x/2"},
+		{RunID: "r1", StackName: "orders-api", SpaceName: "checkout", Title: "apply", CreatedAt: now.Add(-5 * time.Minute), RunURL: "https://x/1"},
+		{RunID: "r2", StackName: "no-space", MatchedLabel: "folder:owning-team/checkout", Title: "apply", CreatedAt: now.Add(-time.Hour), RunURL: "https://x/2"},
 	}
 
 	rows := renderRows(items, 1)
 	if len(rows) != 2 {
 		t.Fatalf("renderRows() returned %d rows, want 2", len(rows))
 	}
-	if rows[0].Team != "ecommerce" {
-		t.Errorf("rows[0].Team = %q, want SpaceName \"ecommerce\"", rows[0].Team)
+	if rows[0].Team != "checkout" {
+		t.Errorf("rows[0].Team = %q, want SpaceName \"checkout\"", rows[0].Team)
 	}
-	if rows[1].Team != "folder:owning-team/ecommerce" {
+	if rows[1].Team != "folder:owning-team/checkout" {
 		t.Errorf("rows[1].Team = %q, want MatchedLabel fallback when SpaceName is empty", rows[1].Team)
 	}
 	if rows[0].Selected {
@@ -158,7 +158,7 @@ func TestDoPoll_NewlyPendingAndStats(t *testing.T) {
 				"edges": [{
 					"node": {
 						"run": {"id": "r1", "canConfirm": true, "title": "apply", "branch": "main", "createdAt": 1000, "updatedAt": 2000},
-						"stack": {"id": "s1", "name": "orders-api", "labels": ["folder:owning-team/ecommerce"], "spaceDetails": {"name": "ecommerce"}}
+						"stack": {"id": "s1", "name": "orders-api", "labels": ["folder:owning-team/checkout"], "spaceDetails": {"name": "checkout"}}
 					}
 				}]
 			}
@@ -175,7 +175,7 @@ func TestDoPoll_NewlyPendingAndStats(t *testing.T) {
 	st.Observe([]string{}, time.Now().Add(-time.Hour)) // establish a warm (non-cold) LastPoll
 
 	cfg := config{}
-	cfg.teamLabels.values = []string{"folder:owning-team/ecommerce"}
+	cfg.teamLabels.values = []string{"folder:owning-team/checkout"}
 
 	viewer := "me"
 	res := doPoll(context.Background(), c, st, cfg, &viewer)
@@ -519,11 +519,11 @@ func TestKeyHints(t *testing.T) {
 }
 
 func TestRenderConfig(t *testing.T) {
-	cfg := config{team: "atlas", activeInterval: 20 * time.Second, idleInterval: time.Minute, requestBudget: 300, remind: 10 * time.Minute}
-	cfg.teamLabels.values = []string{"folder:owning-team/atlas", "folder:collab-team/atlas"}
+	cfg := config{team: "payments", activeInterval: 20 * time.Second, idleInterval: time.Minute, requestBudget: 300, remind: 10 * time.Minute}
+	cfg.teamLabels.values = []string{"folder:owning-team/payments", "folder:collab-team/payments"}
 	var sent []string
 	got := renderConfig(cfg, "me", false, testNotifier(t, &sent), pollResult{reqWindow: 12, reqTotal: 40}, false)
-	for _, want := range []string{"spacewatch - config", "atlas", "folder:owning-team/atlas, folder:collab-team/atlas", "your runs", "every 10m0s", "12 of 300 budget", "40 since start", "[?] close  [q] quit"} {
+	for _, want := range []string{"spacewatch - config", "payments", "folder:owning-team/payments, folder:collab-team/payments", "your runs", "every 10m0s", "12 of 300 budget", "40 since start", "[?] close  [q] quit"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("renderConfig() missing %q:\n%s", want, got)
 		}
@@ -716,13 +716,13 @@ func TestRescheduleForView(t *testing.T) {
 }
 
 func TestRenderConfig_TeamLabelOverride(t *testing.T) {
-	cfg := config{team: "atlas", requestBudget: 300}
+	cfg := config{team: "payments", requestBudget: 300}
 	if err := cfg.teamLabels.Set("custom"); err != nil {
 		t.Fatal(err)
 	}
 	var sent []string
 	got := renderConfig(cfg, "me", false, testNotifier(t, &sent), pollResult{}, false)
-	if strings.Contains(got, "atlas") || !strings.Contains(got, "(custom --team-label)") {
+	if strings.Contains(got, "payments") || !strings.Contains(got, "(custom --team-label)") {
 		t.Errorf("renderConfig() with --team-label override = %q, want the custom label marker, not the team", got)
 	}
 }

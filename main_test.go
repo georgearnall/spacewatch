@@ -61,11 +61,11 @@ func TestParseFlags_Defaults(t *testing.T) {
 }
 
 func TestParseFlags_OverridesReplaceDefaultTeamLabels(t *testing.T) {
-	cfg, err := parseFlags([]string{"--team-label", "folder:owning-team/atlas", "--team-label", "folder:collab-team/ecommerce"})
+	cfg, err := parseFlags([]string{"--team-label", "folder:owning-team/payments", "--team-label", "folder:collab-team/checkout"})
 	if err != nil {
 		t.Fatalf("parseFlags() error = %v", err)
 	}
-	want := []string{"folder:owning-team/atlas", "folder:collab-team/ecommerce"}
+	want := []string{"folder:owning-team/payments", "folder:collab-team/checkout"}
 	if len(cfg.teamLabels.values) != len(want) {
 		t.Fatalf("teamLabels = %v, want %v", cfg.teamLabels.values, want)
 	}
@@ -115,7 +115,7 @@ func TestParseFlags_RejectsInvalidValues(t *testing.T) {
 		{"extra-arg", "--once"},
 		{"--once", "extra-arg"},
 		{"--team", " , "},
-		{"--pick-team", "--team", "atlas"},
+		{"--pick-team", "--team", "payments"},
 		{"--pick-team", "--team-label", "x"},
 	}
 	for _, args := range cases {

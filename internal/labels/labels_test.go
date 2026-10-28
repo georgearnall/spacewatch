@@ -3,7 +3,7 @@ package labels
 import "testing"
 
 func TestMatch(t *testing.T) {
-	cfg := Config{Labels: []string{"folder:owning-team/ecommerce", "folder:owning-team/atlas"}}
+	cfg := Config{Labels: []string{"folder:owning-team/checkout", "folder:owning-team/payments"}}
 
 	cases := []struct {
 		name      string
@@ -13,15 +13,15 @@ func TestMatch(t *testing.T) {
 	}{
 		{
 			name:      "exact match on first configured label",
-			labels:    []string{"folder:owning-team/ecommerce", "disable_autorun"},
+			labels:    []string{"folder:owning-team/checkout", "disable_autorun"},
 			wantMatch: true,
-			wantOn:    "folder:owning-team/ecommerce",
+			wantOn:    "folder:owning-team/checkout",
 		},
 		{
 			name:      "exact match on second configured label",
-			labels:    []string{"folder:owning-team/atlas"},
+			labels:    []string{"folder:owning-team/payments"},
 			wantMatch: true,
-			wantOn:    "folder:owning-team/atlas",
+			wantOn:    "folder:owning-team/payments",
 		},
 		{
 			name:      "no match for unrelated team",
@@ -30,12 +30,12 @@ func TestMatch(t *testing.T) {
 		},
 		{
 			name:      "substring is not a match - exact only",
-			labels:    []string{"folder:owning-team/ecommerce-extra"},
+			labels:    []string{"folder:owning-team/checkout-extra"},
 			wantMatch: false,
 		},
 		{
 			name:      "substring is not a match - prefix only",
-			labels:    []string{"ecommerce"},
+			labels:    []string{"checkout"},
 			wantMatch: false,
 		},
 		{
@@ -59,7 +59,7 @@ func TestMatch(t *testing.T) {
 }
 
 func TestMatch_EmptyConfig(t *testing.T) {
-	got, _ := Match([]string{"folder:owning-team/ecommerce"}, Config{})
+	got, _ := Match([]string{"folder:owning-team/checkout"}, Config{})
 	if got {
 		t.Errorf("Match with empty config should never match, got true")
 	}

@@ -35,10 +35,10 @@ func newTestClient(t *testing.T, handler http.HandlerFunc) *Client {
 }
 
 func TestClient_RunURL(t *testing.T) {
-	sdk := client.New(http.DefaultClient, fakeSession{endpoint: "https://trainline-private.app.spacelift.io/"})
+	sdk := client.New(http.DefaultClient, fakeSession{endpoint: "https://example.app.spacelift.io/"})
 	c := NewFromSDK(sdk)
 
-	if got, want := c.RunURL("applepay-api-prod", "01KZZTZETM9BP9E3XHNH0813NE"), "https://trainline-private.app.spacelift.io/stack/applepay-api-prod/run/01KZZTZETM9BP9E3XHNH0813NE"; got != want {
+	if got, want := c.RunURL("orders-api-prod", "01KZZTZETM9BP9E3XHNH0813NE"), "https://example.app.spacelift.io/stack/orders-api-prod/run/01KZZTZETM9BP9E3XHNH0813NE"; got != want {
 		t.Errorf("RunURL() = %q, want %q", got, want)
 	}
 }

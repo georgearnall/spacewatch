@@ -58,13 +58,13 @@ func edge(runID string, canConfirm bool, stackLabels []string) runEdge {
 }
 
 func TestPoll_FiltersByCanConfirmAndLabel(t *testing.T) {
-	cfg := labels.Config{Labels: []string{"folder:owning-team/ecommerce"}}
+	cfg := labels.Config{Labels: []string{"folder:owning-team/checkout"}}
 
 	var resp searchRunsQuery
 	resp.SearchRuns.Edges = []runEdge{
-		edge("r1", true, []string{"folder:owning-team/ecommerce"}),  // included
-		edge("r2", false, []string{"folder:owning-team/ecommerce"}), // excluded: can't confirm
-		edge("r3", true, []string{"folder:owning-team/atlas"}),      // excluded: wrong team
+		edge("r1", true, []string{"folder:owning-team/checkout"}),  // included
+		edge("r2", false, []string{"folder:owning-team/checkout"}), // excluded: can't confirm
+		edge("r3", true, []string{"folder:owning-team/payments"}),  // excluded: wrong team
 	}
 
 	fc := &fakeClient{responses: []searchRunsQuery{resp}}
@@ -78,21 +78,21 @@ func TestPoll_FiltersByCanConfirmAndLabel(t *testing.T) {
 	if got[0].RunURL != "https://example.test/stack/stack-r1/run/r1" {
 		t.Errorf("RunURL = %q", got[0].RunURL)
 	}
-	if got[0].MatchedLabel != "folder:owning-team/ecommerce" {
+	if got[0].MatchedLabel != "folder:owning-team/checkout" {
 		t.Errorf("MatchedLabel = %q", got[0].MatchedLabel)
 	}
 }
 
 func TestPoll_Pagination(t *testing.T) {
-	cfg := labels.Config{Labels: []string{"folder:owning-team/ecommerce"}}
+	cfg := labels.Config{Labels: []string{"folder:owning-team/checkout"}}
 
 	var page1, page2 searchRunsQuery
 	page1.SearchRuns.PageInfo.HasNextPage = true
 	page1.SearchRuns.PageInfo.EndCursor = "cursor-1"
-	page1.SearchRuns.Edges = append(page1.SearchRuns.Edges, edge("r1", true, []string{"folder:owning-team/ecommerce"}))
+	page1.SearchRuns.Edges = append(page1.SearchRuns.Edges, edge("r1", true, []string{"folder:owning-team/checkout"}))
 
 	page2.SearchRuns.PageInfo.HasNextPage = false
-	page2.SearchRuns.Edges = append(page2.SearchRuns.Edges, edge("r2", true, []string{"folder:owning-team/ecommerce"}))
+	page2.SearchRuns.Edges = append(page2.SearchRuns.Edges, edge("r2", true, []string{"folder:owning-team/checkout"}))
 
 	fc := &fakeClient{responses: []searchRunsQuery{page1, page2}}
 	got, err := Poll(context.Background(), fc, cfg)
@@ -138,7 +138,7 @@ func TestPoll_RealQueryShapeAgainstHTTPServer(t *testing.T) {
 				"edges": [{
 					"node": {
 						"run": {"id": "01K...RUN", "canConfirm": true, "title": "apply", "branch": "main", "createdAt": 1000, "updatedAt": 2000},
-						"stack": {"id": "my-stack", "name": "my-stack", "labels": ["folder:owning-team/ecommerce"], "spaceDetails": {"name": "ecommerce"}}
+						"stack": {"id": "my-stack", "name": "my-stack", "labels": ["folder:owning-team/checkout"], "spaceDetails": {"name": "checkout"}}
 					}
 				}]
 			}
@@ -157,14 +157,14 @@ func TestPoll_RealQueryShapeAgainstHTTPServer(t *testing.T) {
 	sdk := client.New(srv.Client(), fakeSession{endpoint: srv.URL})
 	c := spaceclient.NewFromSDK(sdk)
 
-	got, err := Poll(context.Background(), c, labels.Config{Labels: []string{"folder:owning-team/ecommerce"}})
+	got, err := Poll(context.Background(), c, labels.Config{Labels: []string{"folder:owning-team/checkout"}})
 	if err != nil {
 		t.Fatalf("Poll() error = %v", err)
 	}
 	if len(got) != 1 {
 		t.Fatalf("Poll() = %+v, want 1 result", got)
 	}
-	if got[0].StackName != "my-stack" || got[0].SpaceName != "ecommerce" {
+	if got[0].StackName != "my-stack" || got[0].SpaceName != "checkout" {
 		t.Errorf("Poll() result = %+v, missing expected stack/space name", got[0])
 	}
 
@@ -191,8 +191,8 @@ func TestPoll_RealQueryShapeAgainstHTTPServer(t *testing.T) {
 	}
 	predicate, _ = predicates[1].(map[string]any)
 	constraint, _ := predicate["constraint"].(map[string]any)
-	if predicate["field"] != "labels" || fmt.Sprint(constraint["stringEquals"]) != "[folder:owning-team/ecommerce]" {
-		t.Errorf("second predicate = %v, want labels stringEquals [folder:owning-team/ecommerce]", predicate)
+	if predicate["field"] != "labels" || fmt.Sprint(constraint["stringEquals"]) != "[folder:owning-team/checkout]" {
+		t.Errorf("second predicate = %v, want labels stringEquals [folder:owning-team/checkout]", predicate)
 	}
 }
 

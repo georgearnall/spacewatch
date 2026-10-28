@@ -33,18 +33,18 @@ func TestRenderTable_NoRows(t *testing.T) {
 }
 
 func TestRenderTable_LinksSupported(t *testing.T) {
-	rows := []Row{{Team: "ecommerce", Stack: "orders-api", Title: "apply", Age: "5m", URL: "https://example.test/stack/orders-api/run/r1"}}
+	rows := []Row{{Team: "checkout", Stack: "orders-api", Title: "apply", Age: "5m", URL: "https://example.test/stack/orders-api/run/r1"}}
 	got := RenderTable(rows, true, false, 0)
 	if !strings.Contains(got, "\x1b]8;;https://example.test/stack/orders-api/run/r1\x1b\\") {
 		t.Errorf("RenderTable() with links supported missing OSC 8 escape sequence: %q", got)
 	}
-	if !strings.Contains(got, "ecommerce") || !strings.Contains(got, "orders-api") {
+	if !strings.Contains(got, "checkout") || !strings.Contains(got, "orders-api") {
 		t.Errorf("RenderTable() = %q, missing expected cell content", got)
 	}
 }
 
 func TestRenderTable_LinksUnsupported(t *testing.T) {
-	rows := []Row{{Team: "ecommerce", Stack: "orders-api", Title: "apply", Age: "5m", URL: "https://example.test/stack/orders-api/run/r1"}}
+	rows := []Row{{Team: "checkout", Stack: "orders-api", Title: "apply", Age: "5m", URL: "https://example.test/stack/orders-api/run/r1"}}
 	got := RenderTable(rows, false, false, 0)
 	if strings.Contains(got, "\x1b]8;;") {
 		t.Errorf("RenderTable() with links unsupported should not contain OSC 8 escapes: %q", got)
@@ -57,7 +57,7 @@ func TestRenderTable_LinksUnsupported(t *testing.T) {
 func TestRenderTable_ColumnsAlign(t *testing.T) {
 	rows := []Row{
 		{Team: "e", Stack: "short", Title: "t", Age: "1m", URL: "u"},
-		{Team: "ecommerce-long-name", Stack: "s", Title: "t", Age: "1m", URL: "u"},
+		{Team: "checkout-long-name", Stack: "s", Title: "t", Age: "1m", URL: "u"},
 	}
 	got := RenderTable(rows, false, false, 0)
 	lines := strings.Split(strings.TrimRight(got, "\n"), "\n")
@@ -78,7 +78,7 @@ func TestRenderTable_ColumnsAlign_WithColorEnabled(t *testing.T) {
 	// would misalign columns since %-*s would count escape bytes).
 	rows := []Row{
 		{Team: "e", Stack: "short", Title: "t", Age: "1m", URL: "u"},
-		{Team: "ecommerce-long-name", Stack: "s", Title: "t", Age: "1m", URL: "u", Selected: true},
+		{Team: "checkout-long-name", Stack: "s", Title: "t", Age: "1m", URL: "u", Selected: true},
 	}
 	got := RenderTable(rows, false, true, 0)
 	lines := strings.Split(strings.TrimRight(got, "\n"), "\n")
@@ -115,7 +115,7 @@ func TestRenderTable_ColumnsAlign_ByDisplayWidth(t *testing.T) {
 }
 
 func TestRenderTable_ColorEnabled(t *testing.T) {
-	rows := []Row{{Team: "ecommerce", Stack: "orders-api", Title: "apply", Age: "5m", URL: "u", Selected: true}}
+	rows := []Row{{Team: "checkout", Stack: "orders-api", Title: "apply", Age: "5m", URL: "u", Selected: true}}
 	got := RenderTable(rows, false, true, 0)
 	if !strings.Contains(got, Bold) {
 		t.Errorf("RenderTable() with color enabled missing bold header/selection: %q", got)
@@ -132,7 +132,7 @@ func TestRenderTable_ColorEnabled(t *testing.T) {
 }
 
 func TestRenderTable_ColorDisabled_NoEscapeCodes(t *testing.T) {
-	rows := []Row{{Team: "ecommerce", Stack: "orders-api", Title: "apply", Age: "5m", URL: "u", Selected: true}}
+	rows := []Row{{Team: "checkout", Stack: "orders-api", Title: "apply", Age: "5m", URL: "u", Selected: true}}
 	got := RenderTable(rows, false, false, 0)
 	if strings.Contains(got, "\x1b[") {
 		t.Errorf("RenderTable() with color disabled contains an escape code: %q", got)
@@ -283,12 +283,12 @@ func TestRenderTable_FitsUnchanged(t *testing.T) {
 }
 
 var narrowRow = Row{
-	Team:     "custom-agent-tools-customer-identity-new-verticals-insurance-search",
-	Stack:    "identity-server-api-stg",
-	Title:    "[NB-4384] Add New Relic alerts for session handoff (#698)",
+	Team:     "custom-data-platform-search-discovery-mobile-identity-payments",
+	Stack:    "checkout-server-api-stg",
+	Title:    "[ABC-123] Add alerting for session handoff in checkout (#698)",
 	Plan:     &Plan{Add: 2, Change: 2, Delete: 2},
 	Age:      "3m",
-	URL:      "https://example.test/stack/identity-server-api-stg/run/r1",
+	URL:      "https://example.test/stack/checkout-server-api-stg/run/r1",
 	Selected: true,
 }
 
@@ -303,9 +303,9 @@ func TestRenderTable_StacksWhenTooNarrow(t *testing.T) {
 			t.Errorf("line is %d cells, want <= %d: %q", w, cols, l)
 		}
 	}
-	want := "> custom-agent-tools-customer-identity-new-vertic…\n" +
-		"  identity-server-api-stg  +2 ~2 -2  3m  " + Hyperlink(narrowRow.URL, linkText) + "\n" +
-		"  [NB-4384] Add New Relic alerts for session hand…\n" +
+	want := "> custom-data-platform-search-discovery-mobile-id…\n" +
+		"  checkout-server-api-stg  +2 ~2 -2  3m  " + Hyperlink(narrowRow.URL, linkText) + "\n" +
+		"  [ABC-123] Add alerting for session handoff in c…\n" +
 		"\n" +
 		"  t\n" +
 		"  s  1m  " + Hyperlink("u", linkText) + "\n" +
@@ -318,7 +318,7 @@ func TestRenderTable_StacksWhenTooNarrow(t *testing.T) {
 func TestRenderTable_StackedSplitsLongStack(t *testing.T) {
 	got := RenderTable([]Row{narrowRow}, true, false, 30)
 	lines := strings.Split(got, "\n")
-	if lines[1] != "  identity-server-api-stg" || !strings.HasPrefix(lines[2], "  +2 ~2 -2  3m  ") {
+	if lines[1] != "  checkout-server-api-stg" || !strings.HasPrefix(lines[2], "  +2 ~2 -2  3m  ") {
 		t.Errorf("RenderTable() = %q, want the stack on its own line when it doesn't fit beside the plan", got)
 	}
 }
@@ -332,7 +332,7 @@ func TestRenderTable_StackedKeepsRawURLWhole(t *testing.T) {
 
 func TestRenderTable_StackedColors(t *testing.T) {
 	got := RenderTable([]Row{narrowRow}, true, true, 40)
-	for _, code := range []string{BoldYellow + ">", Cyan, Green + "+2", Yellow + "~2", Red + "-2", Dim + "3m", Bold + "[NB-4384]"} {
+	for _, code := range []string{BoldYellow + ">", Cyan, Green + "+2", Yellow + "~2", Red + "-2", Dim + "3m", Bold + "[ABC-123]"} {
 		if !strings.Contains(got, code) {
 			t.Errorf("RenderTable() stacked with color = %q, missing %q", got, code)
 		}

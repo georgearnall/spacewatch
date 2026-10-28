@@ -10,32 +10,32 @@ import (
 )
 
 var testCandidates = []teamdiscovery.Candidate{
-	{Name: "AgentTools", Slugs: []string{"agenttools", "agent-tools"}, Stacks: 115},
-	{Name: "New Verticals & Insurance", Slugs: []string{"new-verticals-insurance"}, Stacks: 43},
+	{Name: "DataPlatform", Slugs: []string{"dataplatform", "data-platform"}, Stacks: 115},
+	{Name: "Search & Discovery", Slugs: []string{"search-discovery"}, Stacks: 43},
 }
 
 func TestNewPickerState_PreselectsCurrentTeams(t *testing.T) {
-	s := newPickerState(testCandidates, []string{"agent-tools", "agenttools", "atlas"}, "")
+	s := newPickerState(testCandidates, []string{"data-platform", "dataplatform", "payments"}, "")
 
-	if got, want := s.selectedSlugs(), []string{"agenttools", "agent-tools", "atlas"}; !slices.Equal(got, want) {
+	if got, want := s.selectedSlugs(), []string{"dataplatform", "data-platform", "payments"}; !slices.Equal(got, want) {
 		t.Errorf("selectedSlugs() = %v, want %v", got, want)
 	}
 	if !s.items[0].selected {
-		t.Error("AgentTools row not pre-selected, want it selected since all its slugs are current")
+		t.Error("DataPlatform row not pre-selected, want it selected since all its slugs are current")
 	}
-	if last := s.items[len(s.items)-1]; !last.manual || last.name != "atlas" {
-		t.Errorf("last item = %+v, want manual row for atlas", last)
+	if last := s.items[len(s.items)-1]; !last.manual || last.name != "payments" {
+		t.Errorf("last item = %+v, want manual row for payments", last)
 	}
 }
 
 func TestNewPickerState_PartialMatchKeepsExactSlugs(t *testing.T) {
-	s := newPickerState(testCandidates, []string{"agent-tools"}, "")
+	s := newPickerState(testCandidates, []string{"data-platform"}, "")
 
-	if got, want := s.selectedSlugs(), []string{"agent-tools"}; !slices.Equal(got, want) {
-		t.Errorf("selectedSlugs() = %v, want %v (confirming must not add agenttools)", got, want)
+	if got, want := s.selectedSlugs(), []string{"data-platform"}; !slices.Equal(got, want) {
+		t.Errorf("selectedSlugs() = %v, want %v (confirming must not add dataplatform)", got, want)
 	}
 	if s.items[0].selected {
-		t.Error("AgentTools row pre-selected, want only a manual agent-tools row")
+		t.Error("DataPlatform row pre-selected, want only a manual data-platform row")
 	}
 }
 
@@ -47,7 +47,7 @@ func TestPickerApply_ToggleAndConfirm(t *testing.T) {
 	if got := s.apply(keyEnter); got != pickerDone {
 		t.Fatalf("apply(enter) = %v, want pickerDone", got)
 	}
-	if got, want := s.selectedSlugs(), []string{"new-verticals-insurance"}; !slices.Equal(got, want) {
+	if got, want := s.selectedSlugs(), []string{"search-discovery"}; !slices.Equal(got, want) {
 		t.Errorf("selectedSlugs() = %v, want %v", got, want)
 	}
 }
@@ -99,21 +99,21 @@ func TestPickerAddManual(t *testing.T) {
 	s := newPickerState(testCandidates, nil, "")
 	s.cursor = len(s.items)
 
-	s.addManual([]string{"agent-tools", "new-verticals-insurance", "atlas", "atlas"})
+	s.addManual([]string{"data-platform", "search-discovery", "payments", "payments"})
 
-	if got, want := s.selectedSlugs(), []string{"new-verticals-insurance", "agent-tools", "atlas"}; !slices.Equal(got, want) {
+	if got, want := s.selectedSlugs(), []string{"search-discovery", "data-platform", "payments"}; !slices.Equal(got, want) {
 		t.Errorf("selectedSlugs() = %v, want %v", got, want)
 	}
 	if s.items[0].selected {
-		t.Error("AgentTools row selected, want typing agent-tools to select only that slug")
+		t.Error("DataPlatform row selected, want typing data-platform to select only that slug")
 	}
 	if len(s.items) != 4 {
-		t.Errorf("items = %+v, want manual rows added for agent-tools and atlas only", s.items)
+		t.Errorf("items = %+v, want manual rows added for data-platform and payments only", s.items)
 	}
 }
 
 func TestReadKey_LeavesFollowingBytesBuffered(t *testing.T) {
-	r := bufio.NewReader(strings.NewReader("\x1b[B\ratlas\n"))
+	r := bufio.NewReader(strings.NewReader("\x1b[B\rpayments\n"))
 
 	for _, want := range []key{keyDown, keyEnter} {
 		got, err := readKey(r)
@@ -122,14 +122,14 @@ func TestReadKey_LeavesFollowingBytesBuffered(t *testing.T) {
 		}
 	}
 	line, err := r.ReadString('\n')
-	if err != nil || line != "atlas\n" {
+	if err != nil || line != "payments\n" {
 		t.Errorf("rest = %q, %v; want the pasted slug still buffered", line, err)
 	}
 }
 
 func TestReadLine(t *testing.T) {
-	r := bufio.NewReader(strings.NewReader("atlas\rnext\r\nlast\n"))
-	for _, want := range []string{"atlas", "next", "last"} {
+	r := bufio.NewReader(strings.NewReader("payments\rnext\r\nlast\n"))
+	for _, want := range []string{"payments", "next", "last"} {
 		got, err := readLine(r)
 		if err != nil || got != want {
 			t.Fatalf("readLine() = %q, %v; want %q", got, err, want)
@@ -180,15 +180,15 @@ func TestPhysicalRows(t *testing.T) {
 }
 
 func TestRenderPicker(t *testing.T) {
-	s := newPickerState(testCandidates, []string{"atlas"}, "Couldn't discover your teams.")
+	s := newPickerState(testCandidates, []string{"payments"}, "Couldn't discover your teams.")
 	s.apply(keySpace)
 
 	got := renderPicker(s)
 	for _, want := range []string{
 		"Couldn't discover your teams.\r\n",
-		"> [x] AgentTools  (agenttools, agent-tools · 115 stacks)\r\n",
-		"  [ ] New Verticals & Insurance  (new-verticals-insurance · 43 stacks)\r\n",
-		"  [x] atlas  (added manually)\r\n",
+		"> [x] DataPlatform  (dataplatform, data-platform · 115 stacks)\r\n",
+		"  [ ] Search & Discovery  (search-discovery · 43 stacks)\r\n",
+		"  [x] payments  (added manually)\r\n",
 		"  + Type team slugs manually...\r\n",
 	} {
 		if !strings.Contains(got, want) {
@@ -198,8 +198,8 @@ func TestRenderPicker(t *testing.T) {
 }
 
 func TestParseTeamList(t *testing.T) {
-	got := parseTeamList(" atlas, ,ecommerce,atlas ")
-	if want := []string{"atlas", "ecommerce"}; !slices.Equal(got, want) {
+	got := parseTeamList(" payments, ,checkout,payments ")
+	if want := []string{"payments", "checkout"}; !slices.Equal(got, want) {
 		t.Errorf("parseTeamList() = %v, want %v", got, want)
 	}
 }
