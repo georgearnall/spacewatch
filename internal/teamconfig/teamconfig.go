@@ -26,8 +26,8 @@ type fileFormat struct {
 }
 
 // Labels derives the exact-match stack labels that mark a stack as
-// belonging to one of Teams, covering both label conventions Spacelift
-// uses: stacks a team owns, and stacks it merely collaborates on. Returns
+// belonging to one of Teams, covering both team label conventions spacewatch
+// expects: stacks a team owns, and stacks it merely collaborates on. Returns
 // nil if no team is configured.
 func (c *Config) Labels() []string {
 	var out []string

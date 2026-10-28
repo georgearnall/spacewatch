@@ -26,8 +26,8 @@ type queryer interface {
 // Candidate is one of the caller's groups that matches at least one team
 // label in use.
 type Candidate struct {
-	Name   string   // identity-provider group name, e.g. "New Verticals & Insurance"
-	Slugs  []string // matching label slugs, e.g. ["agenttools", "agent-tools"]
+	Name   string   // identity-provider group name, e.g. "Search & Discovery"
+	Slugs  []string // matching label slugs, e.g. ["dataplatform", "data-platform"]
 	Stacks int      // distinct stacks carrying any of Slugs' labels
 }
 
@@ -177,7 +177,7 @@ func match(teams, labels []string, counts []int) []Candidate {
 }
 
 // normalise lowercases s and drops everything but letters and digits, so
-// "New Verticals & Insurance" and "new-verticals-insurance" compare equal.
+// "Search & Discovery" and "search-discovery" compare equal.
 func normalise(s string) string {
 	var b strings.Builder
 	for _, r := range strings.ToLower(s) {

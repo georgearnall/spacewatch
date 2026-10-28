@@ -15,10 +15,10 @@ func TestLabels_EmptyTeamReturnsNil(t *testing.T) {
 }
 
 func TestLabels_DerivesOwningAndCollabLabelsPerTeam(t *testing.T) {
-	c := &Config{Teams: []string{"ecommerce", "atlas"}}
+	c := &Config{Teams: []string{"checkout", "payments"}}
 	want := []string{
-		"folder:owning-team/ecommerce", "folder:collab-team/ecommerce",
-		"folder:owning-team/atlas", "folder:collab-team/atlas",
+		"folder:owning-team/checkout", "folder:collab-team/checkout",
+		"folder:owning-team/payments", "folder:collab-team/payments",
 	}
 
 	got := c.Labels()
@@ -47,7 +47,7 @@ func TestLoad_MissingFileReturnsUnconfigured(t *testing.T) {
 func TestSaveLoad_Roundtrip(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 
-	c := &Config{Teams: []string{"ecommerce", "atlas"}}
+	c := &Config{Teams: []string{"checkout", "payments"}}
 	if err := c.Save(); err != nil {
 		t.Fatalf("Save() error = %v", err)
 	}
@@ -64,13 +64,13 @@ func TestSaveLoad_Roundtrip(t *testing.T) {
 func TestLoad_ReadsLegacySingleTeam(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
-	writeConfig(t, dir, `{"team": "ecommerce"}`)
+	writeConfig(t, dir, `{"team": "checkout"}`)
 
 	got, err := Load()
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	if want := []string{"ecommerce"}; !slices.Equal(got.Teams, want) {
+	if want := []string{"checkout"}; !slices.Equal(got.Teams, want) {
 		t.Errorf("Load() Teams = %v, want %v", got.Teams, want)
 	}
 }
@@ -115,7 +115,7 @@ func TestSave_WritesAtomically(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
 
-	c := &Config{Teams: []string{"ecommerce"}}
+	c := &Config{Teams: []string{"checkout"}}
 	if err := c.Save(); err != nil {
 		t.Fatalf("Save() error = %v", err)
 	}

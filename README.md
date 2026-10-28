@@ -31,11 +31,13 @@ spacewatch [flags]
 
 See `spacewatch --help` for the full flag list. Notably:
 
-- `--team` - comma-separated Spacelift team slugs, e.g. `--team atlas,ecommerce`.
+- `--team` - comma-separated Spacelift team slugs, e.g. `--team payments,checkout`.
   Persisted to `~/.config/spacewatch/config.json` (replacing whatever was
-  stored) and used to watch both label conventions Spacelift has for team
-  ownership: stacks a team *owns* (`folder:owning-team/<slug>`) and stacks
-  it *collaborates on* (`folder:collab-team/<slug>`).
+  stored) and used to watch both team label conventions spacewatch expects:
+  stacks a team *owns* (`folder:owning-team/<slug>`) and stacks it
+  *collaborates on* (`folder:collab-team/<slug>`). These are a labelling
+  convention, not something Spacelift defines; if your stacks are labelled
+  differently, use `--team-label`.
 - `--pick-team` - open the team picker again to change the stored teams.
 - `--team-label` (repeatable) - exact stack label to match instead, for full
   manual control. Bypasses `--team`/`config.json` entirely.
@@ -54,9 +56,9 @@ at least one stack, with the matching slugs and stack counts:
 ```
 $ spacewatch --once
 Select the Spacelift teams to watch (↑/↓ move, space toggle, enter confirm, q quit)
-> [ ] AgentTools  (agenttools, agent-tools · 115 stacks)
-  [x] New Verticals & Insurance  (new-verticals-insurance · 43 stacks)
-  [ ] Hydra  (hydra · 2 stacks)
+> [ ] DataPlatform  (dataplatform, data-platform · 115 stacks)
+  [x] Search & Discovery  (search-discovery · 43 stacks)
+  [ ] Mobile  (mobile · 2 stacks)
   + Type team slugs manually...
 ```
 
@@ -68,7 +70,7 @@ To change the stored teams later, run `spacewatch --pick-team`, or set them
 directly:
 
 ```
-spacewatch --team atlas
+spacewatch --team payments
 ```
 
 ## Keyboard shortcuts (watch mode)
